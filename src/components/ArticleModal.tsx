@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import type { EnrichedArticle } from '../types';
+import { formatDateLong } from '../utils/formatDate';
 
 interface ArticleModalProps {
   article: EnrichedArticle;
@@ -24,18 +25,6 @@ export function ArticleModal({ article, clusterLabel, onClose }: ArticleModalPro
       document.body.style.overflow = '';
     };
   }, []);
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   return (
     <div
@@ -104,7 +93,7 @@ export function ArticleModal({ article, clusterLabel, onClose }: ArticleModalPro
 
           {/* Date */}
           <p className="font-mono text-xs text-slate mb-6">
-            {formatDate(article.pubDate)}
+            {formatDateLong(article.pubDate)}
           </p>
 
           {/* Description */}

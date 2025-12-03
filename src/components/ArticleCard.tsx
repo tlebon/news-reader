@@ -1,4 +1,5 @@
 import type { EnrichedArticle } from '../types';
+import { formatDateShort } from '../utils/formatDate';
 
 interface ArticleCardProps {
 	article: EnrichedArticle;
@@ -13,17 +14,6 @@ export function ArticleCard({
 	clusterLabel,
 	onClick,
 }: ArticleCardProps) {
-	const formatDate = (dateStr: string) => {
-		const date = new Date(dateStr);
-		return date.toLocaleString('en-US', {
-			month: 'short',
-			day: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit',
-			timeZone: 'Europe/Berlin',
-		});
-	};
-
 	return (
 		<article
 			onClick={onClick}
@@ -78,7 +68,7 @@ export function ArticleCard({
 						{article.source_name}
 					</span>
 					<span className="font-mono text-xs text-slate">
-						{formatDate(article.pubDate)}
+						{formatDateShort(article.pubDate)}
 					</span>
 				</div>
 

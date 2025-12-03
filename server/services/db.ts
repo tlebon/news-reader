@@ -126,19 +126,20 @@ export function getArticleAnalysis(articleIds: string[]): Map<string, { sentimen
 export function getCachedArticles(topic: string, region: string, limit = 50) {
   // Get recent feed analysis to find which articles belong to this topic
   const analysis = getRecentFeedAnalysis(topic, region, 60); // 1 hour cache
-  if (!analysis) return null;
+  if (!analysis || !analysis.articleIds || analysis.articleIds.length === 0) return null;
 
-  // Get all articles that have been analyzed for this topic
+  // Only get articles that were part of this topic's analysis
+  const placeholders = analysis.articleIds.map(() => '?').join(',');
   const rows = db.prepare(`
     SELECT
       article_id, title, link, description, content, pub_date,
       image_url, source_id, source_name, source_icon,
       country, category, sentiment, cluster_id
     FROM articles
-    WHERE sentiment IS NOT NULL
+    WHERE article_id IN (${placeholders}) AND sentiment IS NOT NULL
     ORDER BY pub_date DESC
     LIMIT ?
-  `).all(limit) as Array<{
+  `).all(...analysis.articleIds, limit) as Array<{
     article_id: string;
     title: string;
     link: string;
