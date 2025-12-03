@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+/* Fonts: Crimson Pro (serif headlines) + IBM Plex Mono (data/stats) */
+@import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  /* Editor's Desk palette */
+  --ink: #0a0a0a;
+  --ink-light: #1a1a1a;
+  --ink-lighter: #2a2a2a;
+  --cream: #f5f0e6;
+  --cream-dim: #c4bfb4;
+  --amber: #d4a574;
+  --amber-bright: #e8b888;
+  --rust: #b85c38;
+  --sage: #7d9a78;
+  --slate: #5a6a7a;
+
+  /* Sentiment colors */
+  --positive: #7d9a78;
+  --neutral: #8a8578;
+  --negative: #b85c38;
+
+  font-family: 'Crimson Pro', Georgia, serif;
+  line-height: 1.6;
+  font-weight: 400;
+  color: var(--cream);
+  background-color: var(--ink);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(212, 165, 116, 0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(90, 106, 122, 0.05) 0%, transparent 50%),
+    var(--ink);
+}
+
+/* Typography */
+h1, h2, h3 {
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.font-mono {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+a {
+  color: var(--amber);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+a:hover {
+  color: var(--amber-bright);
+}
+
+/* Staggered animations */
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-in {
+  animation: fadeSlideIn 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+/* Utility classes */
+.text-cream { color: var(--cream); }
+.text-cream-dim { color: var(--cream-dim); }
+.text-amber { color: var(--amber); }
+.text-rust { color: var(--rust); }
+.text-sage { color: var(--sage); }
+.text-slate { color: var(--slate); }
+
+.bg-ink { background-color: var(--ink); }
+.bg-ink-light { background-color: var(--ink-light); }
+.bg-ink-lighter { background-color: var(--ink-lighter); }
+
+.border-ink-lighter { border-color: var(--ink-lighter); }
+.border-amber { border-color: var(--amber); }
+
+/* Sentiment badges - bold and visible */
+.sentiment-positive {
+  background-color: var(--positive);
+  color: var(--ink);
+  border-color: var(--positive);
+  font-weight: 500;
+}
+.sentiment-neutral {
+  background-color: var(--amber);
+  color: var(--ink);
+  border-color: var(--amber);
+  font-weight: 500;
+}
+.sentiment-negative {
+  background-color: var(--rust);
+  color: var(--cream);
+  border-color: var(--rust);
+  font-weight: 500;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--ink-light);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--ink-lighter);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--slate);
+}
