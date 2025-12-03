@@ -1,6 +1,4 @@
 import { Router } from 'express';
-import { getEmbeddings } from '../services/embeddingService.js';
-import { kMeansClustering } from '../services/clusteringService.js';
 import { analyzeFeed } from '../services/aiService.js';
 import { updateArticleSentiment, updateArticleCluster, saveFeedAnalysis, getRecentFeedAnalysis, getArticleAnalysis, getArticlesByIds } from '../services/db.js';
 import type { NewsArticle } from '../../src/types/index.js';
@@ -104,25 +102,16 @@ analyzeRouter.get('/', async (req, res) => {
       });
     }
 
-    // Fresh analysis needed
-    // Get embeddings (cached in DB)
-    console.log('Getting embeddings...');
-    const embeddings = await getEmbeddings(articles);
-
-    // Cluster articles
-    console.log('Clustering articles...');
-    const clusters = kMeansClustering(embeddings, numClusters);
+    // Fresh analysis - Claude handles clustering, labeling, and sentiment
+    console.log('Analyzing feed with Claude...');
+    const analysis = await analyzeFeed(articles, numClusters);
 
     // Update cluster assignments in DB
-    for (const cluster of clusters) {
+    analysis.clusters.forEach((cluster, i) => {
       for (const articleId of cluster.articleIds) {
-        updateArticleCluster(articleId, cluster.id);
+        updateArticleCluster(articleId, i);
       }
-    }
-
-    // Analyze with Claude
-    console.log('Analyzing feed with Claude...');
-    const analysis = await analyzeFeed(articles, clusters);
+    });
 
     // Update sentiments in DB
     for (const [articleId, sentiment] of analysis.articleSentiments) {
@@ -135,24 +124,29 @@ analyzeRouter.get('/', async (req, res) => {
       sentimentCounts[sentiment]++;
     }
 
-    // Build enriched articles
-    const enrichedArticles = articles.map(article => {
-      const cluster = clusters.find(c => c.articleIds.includes(article.article_id));
-      return {
-        ...article,
-        sentiment: analysis.articleSentiments.get(article.article_id) || 'neutral',
-        clusterId: cluster?.id ?? 0,
-      };
+    // Build enriched articles with cluster assignments
+    const articleClusterMap = new Map<string, number>();
+    analysis.clusters.forEach((cluster, i) => {
+      for (const articleId of cluster.articleIds) {
+        articleClusterMap.set(articleId, i);
+      }
     });
 
+    const enrichedArticles = articles.map(article => ({
+      ...article,
+      sentiment: analysis.articleSentiments.get(article.article_id) || 'neutral',
+      clusterId: articleClusterMap.get(article.article_id) ?? 0,
+    }));
+
     // Save feed analysis
+    const clusterLabels = analysis.clusters.map(c => c.label);
     saveFeedAnalysis(
       topic,
       region,
       analysis.summary,
       analysis.topKeywords,
       sentimentCounts,
-      analysis.clusterLabels,
+      clusterLabels,
       articles.map(a => a.article_id)
     );
 
@@ -160,9 +154,9 @@ analyzeRouter.get('/', async (req, res) => {
       success: true,
       summary: analysis.summary,
       topKeywords: analysis.topKeywords,
-      clusters: clusters.map((cluster, i) => ({
-        id: cluster.id,
-        label: analysis.clusterLabels[i] || `Topic ${i + 1}`,
+      clusters: analysis.clusters.map((cluster, i) => ({
+        id: i,
+        label: cluster.label,
         articleIds: cluster.articleIds,
       })),
       sentimentCounts,

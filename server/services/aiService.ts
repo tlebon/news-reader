@@ -1,28 +1,27 @@
 import type { NewsArticle } from '../../src/types/index.js';
-import type { Cluster } from './clusteringService.js';
 
 const OPENROUTER_API = 'https://openrouter.ai/api/v1/chat/completions';
 
 export interface FeedAnalysis {
   summary: string;
   topKeywords: string[];
-  clusterLabels: string[];
+  clusters: Array<{ label: string; articleIds: string[] }>;
   articleSentiments: Map<string, 'positive' | 'neutral' | 'negative'>;
 }
 
-// Analyze a feed of articles with clusters
+// Analyze a feed of articles - Claude handles grouping, labeling, and sentiment
 export async function analyzeFeed(
   articles: NewsArticle[],
-  clusters: Cluster[]
+  numClusters: number = 3
 ): Promise<FeedAnalysis> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     throw new Error('OPENROUTER_API_KEY not configured');
   }
 
-  console.log(`Analyzing feed: ${articles.length} articles in ${clusters.length} clusters`);
+  console.log(`Analyzing feed: ${articles.length} articles, requesting ${numClusters} clusters`);
 
-  const prompt = buildFeedPrompt(articles, clusters);
+  const prompt = buildFeedPrompt(articles, numClusters);
 
   const response = await fetch(OPENROUTER_API, {
     method: 'POST',
@@ -78,47 +77,36 @@ export async function analyzeFeed(
   return {
     summary: parsed.summary,
     topKeywords: parsed.topKeywords || [],
-    clusterLabels: parsed.clusterLabels || [],
+    clusters: parsed.clusters || [],
     articleSentiments,
   };
 }
 
-function buildFeedPrompt(articles: NewsArticle[], clusters: Cluster[]): string {
-  // Build article summaries grouped by cluster with descriptions for better context
-  const clusterSections = clusters.map((cluster, i) => {
-    const clusterArticles = articles.filter(a => cluster.articleIds.includes(a.article_id));
-    const articleList = clusterArticles.map(a => {
-      const desc = a.description ? ` — ${a.description.slice(0, 150)}` : '';
-      return `  - [${a.article_id}] "${a.title}"${desc}`;
-    }).join('\n');
-
-    return `Cluster ${i + 1} (${clusterArticles.length} articles):\n${articleList}`;
-  }).join('\n\n');
-
-  const allArticles = articles.map(a =>
-    `[${a.article_id}] "${a.title}" - ${a.description || 'No description'}`
-  ).join('\n');
+function buildFeedPrompt(articles: NewsArticle[], numClusters: number): string {
+  const articleList = articles.map(a => {
+    const desc = a.description ? ` — ${a.description.slice(0, 200)}` : '';
+    return `[${a.article_id}] "${a.title}"${desc}`;
+  }).join('\n');
 
   return `Analyze this news feed and provide:
 
 1. A structured summary ("The Brief") with 3-5 bullet points, each covering a key story or theme. Each bullet should be 1-2 sentences with specific details. Format as a markdown list with "- " prefixes.
 2. Top 5 keywords/topics across all articles
-3. A specific, descriptive label (3-6 words) for each cluster. Include specific names, companies, events, or locations when relevant. Avoid generic labels like "Tech News" or "Business Updates" — be specific about WHAT is happening (e.g., "OpenAI GPT-5 Launch", "EU AI Regulation Vote", "Tesla Q3 Earnings").
+3. Group the articles into ${numClusters} topic clusters based on what they're about. Give each cluster a specific, descriptive label (3-6 words). Include specific names, companies, events, or locations. Avoid generic labels like "Tech News" — be specific (e.g., "OpenAI GPT-5 Launch", "EU AI Regulation Vote").
 4. Sentiment (positive/neutral/negative) for each article
 
-The articles have been pre-grouped into ${clusters.length} clusters by semantic similarity:
-
-${clusterSections}
-
-All articles:
-${allArticles}
+Articles:
+${articleList}
 
 Return JSON in this exact format:
 \`\`\`json
 {
-  "summary": "Brief overview of the news feed...",
+  "summary": "- First bullet point about key story\\n- Second bullet point\\n- Third bullet point",
   "topKeywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
-  "clusterLabels": ["Specific Event Label", "Company/Person Action", "Location Policy Change"],
+  "clusters": [
+    {"label": "Specific Topic Label", "articleIds": ["id1", "id2"]},
+    {"label": "Another Topic", "articleIds": ["id3", "id4", "id5"]}
+  ],
   "articleSentiments": [
     {"articleId": "xxx", "sentiment": "positive"},
     {"articleId": "yyy", "sentiment": "neutral"}

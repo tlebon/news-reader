@@ -1,6 +1,95 @@
 import { useState } from 'react';
 import type { Cluster, SentimentCounts, Sentiment } from '../types';
 
+// Reusable sentiment bar component
+function SentimentBar({
+  sentimentCounts,
+  activeSentiment,
+  onSentimentClick,
+  compact = false,
+}: {
+  sentimentCounts: SentimentCounts;
+  activeSentiment: Sentiment | null;
+  onSentimentClick: (sentiment: Sentiment | null) => void;
+  compact?: boolean;
+}) {
+  const totalArticles = sentimentCounts.positive + sentimentCounts.neutral + sentimentCounts.negative;
+  const height = compact ? 'h-8' : 'h-12';
+  const textSize = compact ? 'text-xs' : 'text-sm';
+
+  if (totalArticles === 0) {
+    return <div className={`w-full ${height} bg-ink-lighter rounded-lg`} />;
+  }
+
+  return (
+    <div className={`flex-1 ${height} rounded-lg overflow-hidden flex ${compact ? 'max-w-md' : ''}`}>
+      {sentimentCounts.positive > 0 && (
+        <button
+          onClick={() => onSentimentClick(activeSentiment === 'positive' ? null : 'positive')}
+          className={`group h-full flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeSentiment === 'positive'
+              ? 'ring-2 ring-inset ring-cream'
+              : activeSentiment ? 'opacity-40 hover:opacity-70' : ''
+          }`}
+          style={{
+            width: `${(sentimentCounts.positive / totalArticles) * 100}%`,
+            backgroundColor: 'var(--sage)',
+          }}
+        >
+          <span className={`font-mono ${textSize} text-ink font-medium group-hover:hidden`}>
+            +{compact ? '' : ' '}{sentimentCounts.positive}
+          </span>
+          <span className={`font-mono ${textSize} text-ink font-medium hidden group-hover:inline`}>
+            Positive
+          </span>
+        </button>
+      )}
+      {sentimentCounts.neutral > 0 && (
+        <button
+          onClick={() => onSentimentClick(activeSentiment === 'neutral' ? null : 'neutral')}
+          className={`group h-full flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeSentiment === 'neutral'
+              ? 'ring-2 ring-inset ring-cream'
+              : activeSentiment ? 'opacity-40 hover:opacity-70' : ''
+          }`}
+          style={{
+            width: `${(sentimentCounts.neutral / totalArticles) * 100}%`,
+            backgroundColor: 'var(--amber)',
+          }}
+        >
+          <span className={`font-mono ${textSize} text-ink font-medium group-hover:hidden`}>
+            ~{compact ? '' : ' '}{sentimentCounts.neutral}
+          </span>
+          <span className={`font-mono ${textSize} text-ink font-medium hidden group-hover:inline`}>
+            Neutral
+          </span>
+        </button>
+      )}
+      {sentimentCounts.negative > 0 && (
+        <button
+          onClick={() => onSentimentClick(activeSentiment === 'negative' ? null : 'negative')}
+          className={`group h-full flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeSentiment === 'negative'
+              ? 'ring-2 ring-inset ring-cream'
+              : activeSentiment ? 'opacity-40 hover:opacity-70' : ''
+          }`}
+          style={{
+            width: `${(sentimentCounts.negative / totalArticles) * 100}%`,
+            backgroundColor: 'var(--rust)',
+          }}
+        >
+          <span className={`font-mono ${textSize} text-cream font-medium group-hover:hidden`}>
+            -{compact ? '' : ' '}{sentimentCounts.negative}
+          </span>
+          <span className={`font-mono ${textSize} text-cream font-medium hidden group-hover:inline`}>
+            Negative
+          </span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface SummaryBarProps {
   summary: string;
   topKeywords: string[];
@@ -90,18 +179,33 @@ export function SummaryBar({
         <div className="p-6 space-y-6">
           {/* Summary */}
           <div>
-            {summary.includes('- ') ? (
-              <ul className="space-y-2">
-                {summary.split('\n').filter(line => line.trim()).map((line, i) => (
-                  <li key={i} className="text-cream text-lg leading-relaxed flex gap-3">
-                    <span className="text-amber">•</span>
-                    <span>{line.replace(/^-\s*/, '')}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-cream text-lg leading-relaxed">{summary}</p>
-            )}
+            {(() => {
+              // Parse bullets - handle various formats
+              const bulletPattern = /^[\-\•\*]\s*|^\d+\.\s+/;
+              let lines = summary.split('\n').map(l => l.trim()).filter(l => l);
+
+              // If it's mostly one line with " - " separators, split on those
+              if (lines.length <= 2 && summary.includes(' - ')) {
+                lines = summary.split(/\s+-\s+/).map(l => l.trim()).filter(l => l);
+              }
+
+              // Clean up any leading bullets/symbols from each line
+              const cleanedLines = lines.map(l => l.replace(bulletPattern, '').trim()).filter(l => l);
+
+              if (cleanedLines.length > 1) {
+                return (
+                  <ul className="space-y-2">
+                    {cleanedLines.map((line, i) => (
+                      <li key={i} className="text-cream text-lg leading-relaxed flex gap-3">
+                        <span className="text-amber">•</span>
+                        <span>{line}</span>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              }
+              return <p className="text-cream text-lg leading-relaxed">{summary}</p>;
+            })()}
           </div>
 
           {/* Keywords */}
@@ -134,7 +238,7 @@ export function SummaryBar({
                   <button
                     key={cluster.id}
                     onClick={() => onClusterClick(activeClusterId === cluster.id ? null : cluster.id)}
-                    className={`font-mono text-sm px-4 py-2 rounded-lg border transition-all ${
+                    className={`font-mono text-sm px-4 py-2 rounded-lg border transition-all cursor-pointer ${
                       activeClusterId === cluster.id
                         ? 'bg-amber text-ink border-amber'
                         : 'bg-ink border-ink-lighter text-cream hover:border-amber'
@@ -163,94 +267,62 @@ export function SummaryBar({
                 </button>
               )}
             </h3>
-
-            {/* Clickable sentiment bar */}
             <div className="flex items-center gap-4">
-              <div className="flex-1 h-12 rounded-lg overflow-hidden flex">
-                {totalArticles > 0 ? (
-                  <>
-                    {sentimentCounts.positive > 0 && (
-                      <button
-                        onClick={() => onSentimentClick(activeSentiment === 'positive' ? null : 'positive')}
-                        className={`group h-full flex items-center justify-center gap-2 transition-all ${
-                          activeSentiment === 'positive'
-                            ? 'ring-2 ring-inset ring-cream'
-                            : activeSentiment ? 'opacity-40 hover:opacity-70' : ''
-                        }`}
-                        style={{
-                          width: `${(sentimentCounts.positive / totalArticles) * 100}%`,
-                          backgroundColor: 'var(--sage)',
-                        }}
-                      >
-                        <span className="font-mono text-sm text-ink font-medium group-hover:hidden">
-                          + {sentimentCounts.positive}
-                        </span>
-                        <span className="font-mono text-sm text-ink font-medium hidden group-hover:inline">
-                          Positive
-                        </span>
-                      </button>
-                    )}
-                    {sentimentCounts.neutral > 0 && (
-                      <button
-                        onClick={() => onSentimentClick(activeSentiment === 'neutral' ? null : 'neutral')}
-                        className={`group h-full flex items-center justify-center gap-2 transition-all ${
-                          activeSentiment === 'neutral'
-                            ? 'ring-2 ring-inset ring-cream'
-                            : activeSentiment ? 'opacity-40 hover:opacity-70' : ''
-                        }`}
-                        style={{
-                          width: `${(sentimentCounts.neutral / totalArticles) * 100}%`,
-                          backgroundColor: 'var(--amber)',
-                        }}
-                      >
-                        <span className="font-mono text-sm text-ink font-medium group-hover:hidden">
-                          ~ {sentimentCounts.neutral}
-                        </span>
-                        <span className="font-mono text-sm text-ink font-medium hidden group-hover:inline">
-                          Neutral
-                        </span>
-                      </button>
-                    )}
-                    {sentimentCounts.negative > 0 && (
-                      <button
-                        onClick={() => onSentimentClick(activeSentiment === 'negative' ? null : 'negative')}
-                        className={`group h-full flex items-center justify-center gap-2 transition-all ${
-                          activeSentiment === 'negative'
-                            ? 'ring-2 ring-inset ring-cream'
-                            : activeSentiment ? 'opacity-40 hover:opacity-70' : ''
-                        }`}
-                        style={{
-                          width: `${(sentimentCounts.negative / totalArticles) * 100}%`,
-                          backgroundColor: 'var(--rust)',
-                        }}
-                      >
-                        <span className="font-mono text-sm text-cream font-medium group-hover:hidden">
-                          - {sentimentCounts.negative}
-                        </span>
-                        <span className="font-mono text-sm text-cream font-medium hidden group-hover:inline">
-                          Negative
-                        </span>
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <div className="w-full h-full bg-ink-lighter rounded-lg" />
-                )}
-              </div>
+              <SentimentBar
+                sentimentCounts={sentimentCounts}
+                activeSentiment={activeSentiment}
+                onSentimentClick={onSentimentClick}
+              />
               <span className="font-mono text-xs text-slate whitespace-nowrap">{totalArticles} articles</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Collapsed preview */}
+      {/* Collapsed view - show filters only */}
       {isCollapsed && (
-        <div className="px-6 py-4">
-          <p className="text-cream-dim text-sm truncate">
-            {summary.includes('- ')
-              ? summary.split('\n').filter(l => l.trim())[0]?.replace(/^-\s*/, '')
-              : summary}
-          </p>
+        <div className="px-6 py-4 space-y-4">
+          {/* Topic clusters - compact */}
+          {clusters.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs text-slate uppercase tracking-wider mr-2">Topics:</span>
+              {clusters.map((cluster) => (
+                <button
+                  key={cluster.id}
+                  onClick={() => onClusterClick(activeClusterId === cluster.id ? null : cluster.id)}
+                  className={`font-mono text-xs px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
+                    activeClusterId === cluster.id
+                      ? 'bg-amber text-ink border-amber'
+                      : 'bg-ink border-ink-lighter text-cream hover:border-amber'
+                  }`}
+                >
+                  {cluster.label}
+                  <span className={`ml-1 ${activeClusterId === cluster.id ? 'text-ink/70' : 'text-slate'}`}>
+                    ({cluster.articleIds.length})
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Sentiment bar - compact */}
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-xs text-slate uppercase tracking-wider">Sentiment:</span>
+            <SentimentBar
+              sentimentCounts={sentimentCounts}
+              activeSentiment={activeSentiment}
+              onSentimentClick={onSentimentClick}
+              compact
+            />
+            {activeSentiment && (
+              <button
+                onClick={() => onSentimentClick(null)}
+                className="font-mono text-xs text-amber hover:text-cream cursor-pointer"
+              >
+                clear
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

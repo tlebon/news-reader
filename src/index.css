@@ -114,6 +114,20 @@ a:hover {
   font-weight: 500;
 }
 
+/* Close button */
+.close-btn {
+  background-color: var(--ink-light);
+  border: 1px solid var(--ink-lighter);
+  color: var(--cream-dim);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.close-btn:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+  background-color: var(--ink-lighter);
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;

@@ -1,73 +1,39 @@
-# React + TypeScript + Vite
+# NewsReader
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is a news reader and summarizing app I built to try to match the specifications given in the challenge. I tried to choose the most pragmatic tooling and technology options to create a nice experience for the end user.
 
-Currently, two official plugins are available:
+The app pulls news articles from an api and sends them to claude for sentiment/summary/topic clustering. 
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Stack:
+FE:
+React
+Typescript
+TailwindCSS
 
-## React Compiler
+BE:
+node
+express
+sqlite
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## How you would take this prototype to production
 
-## Expanding the ESLint configuration
+I didn't focus on testing so much. I also decided to keep the codebase more simple. we are also using sqlite.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## What you would improve or redesign with more time
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+I still think Id test differnt layouts a bit more to try to find the best one. I think there could be nice ways to interact with the data that I havent landed on yet. In general I'm happy with the brief but I think it could probably be expanded.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## What technical/product trade-offs you made during the task
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+tanstack/react query vs fetch - fetch is simpler, no need to use tanstack for this scale.
+sqlite vs localstorage vs caching (tanstack/server) - sqlite allows for persistence without overhead of full postgres implementation
+vite + express vs next- vite and express is simple.
+embedding vs prompting - embedding adds too much bloat for the value it adds for this scale.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Considerations for scaling, reliability, performance, or UX
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+i was experimenting with clustering/embedding but i think for this use case and project size it felt like overkill in the end. its also not a topic i am the most familiar with so i didnt think it made sense to implement it so i stripped it from the final. probably you would eventually need to switch to postgres or something. 
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Any tooling, architecture, or model choice decisions you would revisit
+
+for the best user experience it probably makes sense to call the AI before a user visits the pages and have the summary preloaded? that would remove some latency.

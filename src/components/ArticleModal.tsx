@@ -43,7 +43,7 @@ export function ArticleModal({ article, clusterLabel, onClose }: ArticleModalPro
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate hover:text-cream transition-colors font-mono text-xl leading-none p-1 z-10"
+          className="close-btn absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded font-mono text-lg z-10"
           aria-label="Close"
         >
           ×
@@ -154,22 +154,16 @@ export function ArticleModal({ article, clusterLabel, onClose }: ArticleModalPro
             </div>
           )}
 
-          {/* Action buttons */}
-          <div className="flex gap-3 pt-4 border-t border-ink-lighter">
+          {/* Action button */}
+          <div className="pt-4 border-t border-ink-lighter">
             <a
               href={article.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 bg-amber text-ink font-mono text-sm font-medium px-4 py-3 rounded text-center hover:bg-amber-bright transition-colors"
+              className="block w-full bg-amber text-ink font-mono text-sm font-medium px-4 py-3 rounded text-center hover:bg-amber-bright transition-colors"
             >
-              Read Full Article
+              Read Full Article →
             </a>
-            <button
-              onClick={onClose}
-              className="px-4 py-3 border border-ink-lighter text-cream-dim font-mono text-sm rounded hover:border-slate transition-colors"
-            >
-              Close
-            </button>
           </div>
         </div>
       </div>

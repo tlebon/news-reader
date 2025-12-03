@@ -86,23 +86,12 @@ export function upsertArticle(article: NewsArticle) {
   );
 }
 
-export function updateArticleEmbedding(articleId: string, embedding: number[]) {
-  const buffer = Buffer.from(new Float32Array(embedding).buffer);
-  db.prepare('UPDATE articles SET embedding = ? WHERE article_id = ?').run(buffer, articleId);
-}
-
 export function updateArticleSentiment(articleId: string, sentiment: string) {
   db.prepare('UPDATE articles SET sentiment = ? WHERE article_id = ?').run(sentiment, articleId);
 }
 
 export function updateArticleCluster(articleId: string, clusterId: number) {
   db.prepare('UPDATE articles SET cluster_id = ? WHERE article_id = ?').run(clusterId, articleId);
-}
-
-export function getArticleEmbedding(articleId: string): number[] | null {
-  const row = db.prepare('SELECT embedding FROM articles WHERE article_id = ?').get(articleId) as { embedding: Buffer } | undefined;
-  if (!row?.embedding) return null;
-  return Array.from(new Float32Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.length / 4));
 }
 
 // Get sentiment and cluster for articles
