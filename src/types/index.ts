@@ -42,16 +42,6 @@ export interface SentimentCounts {
   negative: number;
 }
 
-// Full feed analysis response
-export interface FeedAnalysis {
-  summary: string;
-  topKeywords: string[];
-  clusters: Cluster[];
-  sentimentCounts: SentimentCounts;
-  articles: EnrichedArticle[];
-  nextCursor: string | null;
-}
-
 // API response from NewsData.io
 export interface NewsDataResponse {
   status: string;

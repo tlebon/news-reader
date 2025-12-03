@@ -55,10 +55,6 @@ db.exec(`
 `);
 
 // Article operations
-export function getArticle(articleId: string) {
-  return db.prepare('SELECT * FROM articles WHERE article_id = ?').get(articleId);
-}
-
 export function getArticlesByIds(articleIds: string[]) {
   const placeholders = articleIds.map(() => '?').join(',');
   return db.prepare(`SELECT * FROM articles WHERE article_id IN (${placeholders})`).all(...articleIds);
@@ -107,16 +103,6 @@ export function getArticleEmbedding(articleId: string): number[] | null {
   const row = db.prepare('SELECT embedding FROM articles WHERE article_id = ?').get(articleId) as { embedding: Buffer } | undefined;
   if (!row?.embedding) return null;
   return Array.from(new Float32Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.length / 4));
-}
-
-export function getArticlesWithEmbeddings(articleIds: string[]): Array<{ article_id: string; embedding: number[] }> {
-  const placeholders = articleIds.map(() => '?').join(',');
-  const rows = db.prepare(`SELECT article_id, embedding FROM articles WHERE article_id IN (${placeholders}) AND embedding IS NOT NULL`).all(...articleIds) as Array<{ article_id: string; embedding: Buffer }>;
-
-  return rows.map(row => ({
-    article_id: row.article_id,
-    embedding: Array.from(new Float32Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.length / 4))
-  }));
 }
 
 // Get sentiment and cluster for articles

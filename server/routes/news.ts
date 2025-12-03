@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { fetchNews } from '../services/newsService.js';
+import { upsertArticle } from '../services/db.js';
 
 export const newsRouter = Router();
 
@@ -11,6 +12,11 @@ newsRouter.get('/', async (req, res) => {
     const cursor = req.query.cursor as string | undefined;
 
     const { articles, nextCursor } = await fetchNews(topic, country, cursor);
+
+    // Store articles in DB for later analysis
+    for (const article of articles) {
+      upsertArticle(article);
+    }
 
     res.json({
       success: true,

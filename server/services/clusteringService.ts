@@ -109,27 +109,3 @@ function averageVectors(vectors: number[][]): number[] {
 
   return avg;
 }
-
-// Get representative article from each cluster (closest to centroid)
-export function getClusterRepresentatives(
-  clusters: Cluster[],
-  embeddings: Map<string, number[]>
-): string[] {
-  return clusters.map(cluster => {
-    let bestId = cluster.articleIds[0];
-    let bestSimilarity = -Infinity;
-
-    for (const id of cluster.articleIds) {
-      const vec = embeddings.get(id);
-      if (vec) {
-        const sim = cosineSimilarity(vec, cluster.centroid);
-        if (sim > bestSimilarity) {
-          bestSimilarity = sim;
-          bestId = id;
-        }
-      }
-    }
-
-    return bestId;
-  });
-}

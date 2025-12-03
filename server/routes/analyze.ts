@@ -1,127 +1,115 @@
 import { Router } from 'express';
-import { fetchNews } from '../services/newsService.js';
 import { getEmbeddings } from '../services/embeddingService.js';
 import { kMeansClustering } from '../services/clusteringService.js';
 import { analyzeFeed } from '../services/aiService.js';
-import { upsertArticle, updateArticleSentiment, updateArticleCluster, saveFeedAnalysis, getRecentFeedAnalysis, getArticleAnalysis } from '../services/db.js';
+import { updateArticleSentiment, updateArticleCluster, saveFeedAnalysis, getRecentFeedAnalysis, getArticleAnalysis, getArticlesByIds } from '../services/db.js';
 import type { NewsArticle } from '../../src/types/index.js';
 
 export const analyzeRouter = Router();
 
-export interface AnalyzedFeed {
-  summary: string;
-  topKeywords: string[];
-  clusters: Array<{
-    id: number;
-    label: string;
-    articleIds: string[];
-  }>;
-  sentimentCounts: {
-    positive: number;
-    neutral: number;
-    negative: number;
-  };
-  articles: Array<NewsArticle & {
-    sentiment: 'positive' | 'neutral' | 'negative';
-    clusterId: number;
-  }>;
-  nextCursor: string | null;
-}
-
-// GET /api/analyze?topic=AI&region=de
-// Fetches articles, embeds, clusters, and analyzes in one call
+// GET /api/analyze?topic=AI&region=de&articleIds=id1,id2,id3
+// Analyzes articles that are already in DB (pass IDs from /api/news response)
 analyzeRouter.get('/', async (req, res) => {
   try {
     const topic = (req.query.topic as string) || 'artificial intelligence';
     const region = (req.query.region as string) || 'de';
-    const cursor = req.query.cursor as string | undefined;
+    const articleIdsParam = req.query.articleIds as string | undefined;
     const numClusters = Math.min(3, Math.max(2, parseInt(req.query.clusters as string) || 3));
 
-    // Fetch articles from NewsData
-    console.log(`Fetching news for topic="${topic}", region="${region}"${cursor ? `, cursor="${cursor}"` : ''}`);
-    const { articles, nextCursor } = await fetchNews(topic, region, cursor);
+    if (!articleIdsParam) {
+      return res.status(400).json({
+        success: false,
+        error: 'articleIds parameter required. Call /api/news first, then pass article IDs here.',
+      });
+    }
 
-    if (articles.length === 0) {
+    const articleIds = articleIdsParam.split(',').filter(id => id.trim());
+
+    // Get articles from DB (they were stored by /api/news)
+    const dbRows = getArticlesByIds(articleIds);
+
+    if (dbRows.length === 0) {
       return res.json({
         success: true,
-        summary: 'No articles found for this topic and region.',
+        summary: 'No articles found.',
         topKeywords: [],
         clusters: [],
         sentimentCounts: { positive: 0, neutral: 0, negative: 0 },
         articles: [],
-        nextCursor: null,
       });
     }
 
-    // Store articles in DB
-    for (const article of articles) {
-      upsertArticle(article);
-    }
+    // Map DB rows to NewsArticle format
+    const articles: NewsArticle[] = dbRows.map((row: any) => ({
+      article_id: row.article_id,
+      title: row.title,
+      link: row.link,
+      description: row.description,
+      content: row.content,
+      pubDate: row.pub_date,
+      image_url: row.image_url,
+      source_id: row.source_id || '',
+      source_name: row.source_name || '',
+      source_icon: row.source_icon,
+      country: JSON.parse(row.country || '[]'),
+      category: JSON.parse(row.category || '[]'),
+    }));
 
-    // Check for cached feed analysis (only for initial load, not pagination)
-    if (!cursor) {
-      const cached = getRecentFeedAnalysis(topic, region, 30);
-      if (cached) {
-        // Get stored analysis for these articles
-        const articleAnalysis = getArticleAnalysis(articles.map(a => a.article_id));
+    console.log(`Analyzing ${articles.length} articles for topic="${topic}", region="${region}"`);
 
-        // Check if we have sentiment data for most articles
-        const articlesWithSentiment = articles.filter(a => {
-          const analysis = articleAnalysis.get(a.article_id);
-          return analysis && analysis.sentiment && analysis.sentiment !== 'neutral';
-        }).length;
+    // Check for cached analysis - if we have recent feed analysis AND most articles have sentiment
+    const cachedFeed = getRecentFeedAnalysis(topic, region, 60);
+    const existingAnalysis = getArticleAnalysis(articleIds);
+    const analyzedCount = Array.from(existingAnalysis.values()).filter(a => a.sentiment).length;
 
-        // If at least 50% have real sentiment data, use cache
-        if (articlesWithSentiment >= articles.length * 0.5) {
-          console.log(`Returning cached feed analysis (${articlesWithSentiment}/${articles.length} articles have sentiment)`);
+    if (cachedFeed && analyzedCount >= articles.length * 0.8) {
+      console.log(`Using cached analysis (${analyzedCount}/${articles.length} articles have sentiment)`);
 
-          const enrichedArticles = articles.map(article => {
-            const analysis = articleAnalysis.get(article.article_id);
-            return {
-              ...article,
-              sentiment: (analysis?.sentiment || 'neutral') as 'positive' | 'neutral' | 'negative',
-              clusterId: analysis?.clusterId ?? 0,
-            };
-          });
+      // Build enriched articles from cached data
+      const enrichedArticles = articles.map(article => {
+        const analysis = existingAnalysis.get(article.article_id);
+        return {
+          ...article,
+          sentiment: (analysis?.sentiment || 'neutral') as 'positive' | 'neutral' | 'negative',
+          clusterId: analysis?.clusterId ?? 0,
+        };
+      });
 
-          // Rebuild cluster articleIds from enriched articles
-          const clusterArticleIds = new Map<number, string[]>();
-          for (const article of enrichedArticles) {
-            const ids = clusterArticleIds.get(article.clusterId) || [];
-            ids.push(article.article_id);
-            clusterArticleIds.set(article.clusterId, ids);
-          }
-
-          // Recalculate sentiment counts from actual articles
-          const sentimentCounts = { positive: 0, neutral: 0, negative: 0 };
-          for (const article of enrichedArticles) {
-            sentimentCounts[article.sentiment]++;
-          }
-
-          return res.json({
-            success: true,
-            cached: true,
-            summary: cached.summary,
-            topKeywords: cached.topKeywords,
-            clusters: cached.clusterLabels.map((label: string, i: number) => ({
-              id: i,
-              label,
-              articleIds: clusterArticleIds.get(i) || [],
-            })),
-            sentimentCounts,
-            articles: enrichedArticles,
-            nextCursor,
-          });
-        } else {
-          console.log(`Cache miss: only ${articlesWithSentiment}/${articles.length} articles have sentiment data, re-analyzing`);
-        }
+      // Rebuild clusters from articles
+      const clusterMap = new Map<number, string[]>();
+      for (const article of enrichedArticles) {
+        const ids = clusterMap.get(article.clusterId) || [];
+        ids.push(article.article_id);
+        clusterMap.set(article.clusterId, ids);
       }
+
+      // Recalculate sentiment counts
+      const sentimentCounts = { positive: 0, neutral: 0, negative: 0 };
+      for (const article of enrichedArticles) {
+        sentimentCounts[article.sentiment]++;
+      }
+
+      return res.json({
+        success: true,
+        cached: true,
+        summary: cachedFeed.summary,
+        topKeywords: cachedFeed.topKeywords,
+        clusters: cachedFeed.clusterLabels.map((label: string, i: number) => ({
+          id: i,
+          label,
+          articleIds: clusterMap.get(i) || [],
+        })),
+        sentimentCounts,
+        articles: enrichedArticles,
+      });
     }
 
     // Fresh analysis needed
+    // Get embeddings (cached in DB)
     console.log('Getting embeddings...');
     const embeddings = await getEmbeddings(articles);
 
+    // Cluster articles
     console.log('Clustering articles...');
     const clusters = kMeansClustering(embeddings, numClusters);
 
@@ -132,6 +120,7 @@ analyzeRouter.get('/', async (req, res) => {
       }
     }
 
+    // Analyze with Claude
     console.log('Analyzing feed with Claude...');
     const analysis = await analyzeFeed(articles, clusters);
 
@@ -146,7 +135,7 @@ analyzeRouter.get('/', async (req, res) => {
       sentimentCounts[sentiment]++;
     }
 
-    // Build response
+    // Build enriched articles
     const enrichedArticles = articles.map(article => {
       const cluster = clusters.find(c => c.articleIds.includes(article.article_id));
       return {
@@ -156,20 +145,19 @@ analyzeRouter.get('/', async (req, res) => {
       };
     });
 
-    // Save feed analysis to DB (only for initial load)
-    if (!cursor) {
-      saveFeedAnalysis(
-        topic,
-        region,
-        analysis.summary,
-        analysis.topKeywords,
-        sentimentCounts,
-        analysis.clusterLabels,
-        articles.map(a => a.article_id)
-      );
-    }
+    // Save feed analysis
+    saveFeedAnalysis(
+      topic,
+      region,
+      analysis.summary,
+      analysis.topKeywords,
+      sentimentCounts,
+      analysis.clusterLabels,
+      articles.map(a => a.article_id)
+    );
 
-    const response: AnalyzedFeed = {
+    res.json({
+      success: true,
       summary: analysis.summary,
       topKeywords: analysis.topKeywords,
       clusters: clusters.map((cluster, i) => ({
@@ -179,10 +167,7 @@ analyzeRouter.get('/', async (req, res) => {
       })),
       sentimentCounts,
       articles: enrichedArticles,
-      nextCursor,
-    };
-
-    res.json({ success: true, ...response });
+    });
   } catch (error) {
     console.error('Error analyzing feed:', error);
     res.status(500).json({

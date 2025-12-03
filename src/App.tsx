@@ -105,7 +105,9 @@ function App() {
       if (!append && newsData.articles.length > 0) {
         setIsAnalyzing(true);
 
-        const analyzeParams = new URLSearchParams({ topic, region });
+        // Pass article IDs to analyze endpoint (articles already stored in DB by /api/news)
+        const articleIds = newsData.articles.map((a: EnrichedArticle) => a.article_id).join(',');
+        const analyzeParams = new URLSearchParams({ topic, region, articleIds });
         const analyzeRes = await fetch(`${API_BASE}/analyze?${analyzeParams}`);
 
         if (analyzeRes.ok) {
