@@ -1,7 +1,7 @@
-@import "tailwindcss";
-
 /* Fonts: Crimson Pro (serif headlines) + IBM Plex Mono (data/stats) */
 @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+@import "tailwindcss";
 
 :root {
   /* Editor's Desk palette */

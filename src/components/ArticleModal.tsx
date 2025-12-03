@@ -3,12 +3,11 @@ import type { EnrichedArticle } from '../types';
 
 interface ArticleModalProps {
   article: EnrichedArticle;
+  clusterLabel: string;
   onClose: () => void;
 }
 
-export function ArticleModal({ article, onClose }: ArticleModalProps) {
-  const hasClaude = !!article.claude;
-
+export function ArticleModal({ article, clusterLabel, onClose }: ArticleModalProps) {
   // Close on escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -55,7 +54,7 @@ export function ArticleModal({ article, onClose }: ArticleModalProps) {
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate hover:text-cream transition-colors font-mono text-xl leading-none p-1"
+          className="absolute top-4 right-4 text-slate hover:text-cream transition-colors font-mono text-xl leading-none p-1 z-10"
           aria-label="Close"
         >
           ×
@@ -63,17 +62,31 @@ export function ArticleModal({ article, onClose }: ArticleModalProps) {
 
         {/* Image */}
         {article.image_url && (
-          <img
-            src={article.image_url}
-            alt=""
-            className="w-full h-48 object-cover opacity-80"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
-          />
+          <div className="relative">
+            <img
+              src={article.image_url}
+              alt=""
+              className="w-full h-48 object-cover opacity-80"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+            <span className={`absolute top-4 left-4 font-mono text-xs px-2 py-1 rounded sentiment-${article.sentiment}`}>
+              {article.sentiment}
+            </span>
+          </div>
         )}
 
         <div className="p-6">
+          {/* Sentiment badge when no image */}
+          {!article.image_url && (
+            <div className="mb-4">
+              <span className={`font-mono text-xs px-2 py-1 rounded sentiment-${article.sentiment}`}>
+                {article.sentiment}
+              </span>
+            </div>
+          )}
+
           {/* Source & date */}
           <div className="flex items-center gap-2 mb-3">
             {article.source_icon && (
@@ -82,11 +95,6 @@ export function ArticleModal({ article, onClose }: ArticleModalProps) {
             <span className="font-mono text-sm text-cream-dim">
               {article.source_name}
             </span>
-            {hasClaude && (
-              <span className={`font-mono text-xs px-2 py-0.5 border rounded ml-auto sentiment-${article.claude!.sentiment}`}>
-                {article.claude!.sentiment}
-              </span>
-            )}
           </div>
 
           {/* Title */}
@@ -99,55 +107,25 @@ export function ArticleModal({ article, onClose }: ArticleModalProps) {
             {formatDate(article.pubDate)}
           </p>
 
-          {/* AI Summary */}
-          {hasClaude ? (
-            <div className="mb-6">
-              <h3 className="font-mono text-xs text-amber uppercase tracking-wider mb-3">
-                AI Summary
-              </h3>
-              <p className="text-cream-dim leading-relaxed text-lg">
-                {article.claude!.summary}
-              </p>
-            </div>
-          ) : (
-            <div className="mb-6">
-              <h3 className="font-mono text-xs text-slate uppercase tracking-wider mb-3">
-                Description
-              </h3>
-              <p className="text-cream-dim leading-relaxed">
-                {article.description || 'No description available. Click "Read Article" to view the full story.'}
-              </p>
-            </div>
-          )}
+          {/* Description */}
+          <div className="mb-6">
+            <h3 className="font-mono text-xs text-amber uppercase tracking-wider mb-3">
+              Description
+            </h3>
+            <p className="text-cream-dim leading-relaxed text-lg">
+              {article.description || 'No description available. Click "Read Article" to view the full story.'}
+            </p>
+          </div>
 
-          {/* Keywords */}
-          {hasClaude && article.claude!.keywords.length > 0 && (
-            <div className="mb-6">
-              <h3 className="font-mono text-xs text-slate uppercase tracking-wider mb-3">
-                Keywords
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {article.claude!.keywords.map((kw) => (
-                  <span
-                    key={kw}
-                    className="font-mono text-sm bg-amber/20 text-amber px-3 py-1 rounded"
-                  >
-                    {kw}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Topic group */}
-          {hasClaude && article.claude!.groupLabel && (
-            <div className="mb-6">
-              <h3 className="font-mono text-xs text-slate uppercase tracking-wider mb-2">
-                Topic Cluster
-              </h3>
-              <p className="text-cream-dim">{article.claude!.groupLabel}</p>
-            </div>
-          )}
+          {/* Topic cluster */}
+          <div className="mb-6">
+            <h3 className="font-mono text-xs text-slate uppercase tracking-wider mb-2">
+              Topic Cluster
+            </h3>
+            <span className="font-mono text-sm bg-amber/20 text-amber px-3 py-1 rounded">
+              {clusterLabel}
+            </span>
+          </div>
 
           {/* Categories */}
           {article.category && article.category.length > 0 && (
@@ -168,6 +146,25 @@ export function ArticleModal({ article, onClose }: ArticleModalProps) {
             </div>
           )}
 
+          {/* Keywords if present */}
+          {article.keywords && article.keywords.length > 0 && (
+            <div className="mb-6">
+              <h3 className="font-mono text-xs text-slate uppercase tracking-wider mb-3">
+                Keywords
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {article.keywords.map((kw) => (
+                  <span
+                    key={kw}
+                    className="font-mono text-sm bg-ink-lighter text-cream-dim px-3 py-1 rounded"
+                  >
+                    {kw}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Action buttons */}
           <div className="flex gap-3 pt-4 border-t border-ink-lighter">
             <a
@@ -176,7 +173,7 @@ export function ArticleModal({ article, onClose }: ArticleModalProps) {
               rel="noopener noreferrer"
               className="flex-1 bg-amber text-ink font-mono text-sm font-medium px-4 py-3 rounded text-center hover:bg-amber-bright transition-colors"
             >
-              Read Full Article →
+              Read Full Article
             </a>
             <button
               onClick={onClose}

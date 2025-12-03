@@ -6,42 +6,50 @@ export interface NewsArticle {
   description: string | null;
   content: string | null;
   pubDate: string;
-  pubDateTZ: string;
+  pubDateTZ?: string;
   image_url: string | null;
-  video_url: string | null;
+  video_url?: string | null;
   source_id: string;
   source_name: string;
-  source_url: string;
+  source_url?: string;
   source_icon: string | null;
-  source_priority: number;
-  language: string;
+  source_priority?: number;
+  language?: string;
   country: string[];
   category: string[];
-  creator: string[] | null;
-  keywords: string[] | null;
-  duplicate: boolean;
+  creator?: string[] | null;
+  keywords?: string[] | null;
+  duplicate?: boolean;
 }
 
-// Claude's analysis (for comparison)
-export interface ClaudeAnalysis {
-  summary: string;
-  keywords: string[];
-  sentiment: 'positive' | 'neutral' | 'negative';
-  sentimentScore: number; // -1 to 1
-  groupId: string;
-  groupLabel: string;
-}
-
-// Article with both NewsData AI and Claude analysis
+// Article with sentiment and cluster assignment
 export interface EnrichedArticle extends NewsArticle {
-  claude?: ClaudeAnalysis;
+  sentiment: 'positive' | 'neutral' | 'negative';
+  clusterId: number;
 }
 
-// Article group (clustered by AI)
-export interface ArticleGroup {
-  id: string;
+// Cluster info
+export interface Cluster {
+  id: number;
   label: string;
+  articleIds: string[];
+}
+
+// Sentiment counts
+export interface SentimentCounts {
+  positive: number;
+  neutral: number;
+  negative: number;
+}
+
+// Full feed analysis response
+export interface FeedAnalysis {
+  summary: string;
+  topKeywords: string[];
+  clusters: Cluster[];
+  sentimentCounts: SentimentCounts;
   articles: EnrichedArticle[];
+  nextCursor: string | null;
 }
 
 // API response from NewsData.io
@@ -74,5 +82,6 @@ export const TOPICS = [
   { id: 'entertainment', name: 'Entertainment' },
 ] as const;
 
-export type RegionCode = typeof REGIONS[number]['code'];
-export type TopicId = typeof TOPICS[number]['id'];
+export type RegionCode = (typeof REGIONS)[number]['code'];
+export type TopicId = (typeof TOPICS)[number]['id'];
+export type Sentiment = 'positive' | 'neutral' | 'negative';

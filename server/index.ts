@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { newsRouter } from './routes/news.js';
 import { analyzeRouter } from './routes/analyze.js';
+import { cachedRouter } from './routes/cached.js';
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.get('/api/health', (_req, res) => {
 // Routes
 app.use('/api/news', newsRouter);
 app.use('/api/analyze', analyzeRouter);
+app.use('/api/cached', cachedRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

@@ -1,54 +1,28 @@
-import type { NewsArticle, ClaudeAnalysis } from '../../src/types/index.js';
+import type { NewsArticle } from '../../src/types/index.js';
+import type { Cluster } from './clusteringService.js';
 
 const OPENROUTER_API = 'https://openrouter.ai/api/v1/chat/completions';
 
-interface OpenRouterResponse {
-  choices: Array<{
-    message: {
-      content: string;
-    };
-  }>;
-}
-
-// Raw Claude response (includes articleId)
-type ClaudeRawResponse = Array<{
-  articleId: string;
+export interface FeedAnalysis {
   summary: string;
-  keywords: string[];
-  sentiment: 'positive' | 'neutral' | 'negative';
-  sentimentScore: number;
-  groupId: string;
-  groupLabel: string;
-}>;
-
-// Simple in-memory cache with TTL
-const cache = new Map<string, { data: ClaudeRawResponse; timestamp: number }>();
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-
-function getCacheKey(articles: NewsArticle[]): string {
-  return articles.map(a => a.article_id).sort().join(':');
+  topKeywords: string[];
+  clusterLabels: string[];
+  articleSentiments: Map<string, 'positive' | 'neutral' | 'negative'>;
 }
 
-export async function analyzeArticles(
-  articles: NewsArticle[]
-): Promise<ClaudeRawResponse> {
+// Analyze a feed of articles with clusters
+export async function analyzeFeed(
+  articles: NewsArticle[],
+  clusters: Cluster[]
+): Promise<FeedAnalysis> {
   const apiKey = process.env.OPENROUTER_API_KEY;
-
   if (!apiKey) {
     throw new Error('OPENROUTER_API_KEY not configured');
   }
 
-  // Check cache
-  const cacheKey = getCacheKey(articles);
-  const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    console.log('Returning cached Claude analysis');
-    return cached.data;
-  }
+  console.log(`Analyzing feed: ${articles.length} articles in ${clusters.length} clusters`);
 
-  console.log(`Analyzing ${articles.length} articles with Claude...`);
-
-  const prompt = buildPrompt(articles);
+  const prompt = buildFeedPrompt(articles, clusters);
 
   const response = await fetch(OPENROUTER_API, {
     method: 'POST',
@@ -59,14 +33,9 @@ export async function analyzeArticles(
       'X-Title': 'News Reader Dashboard',
     },
     body: JSON.stringify({
-      model: 'anthropic/claude-4.5-sonnet',
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      max_tokens: 4000,
+      model: 'anthropic/claude-sonnet-4',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 2000,
     }),
   });
 
@@ -75,92 +44,87 @@ export async function analyzeArticles(
     throw new Error(`OpenRouter API error: ${response.status} - ${error}`);
   }
 
-  const data = await response.json() as OpenRouterResponse;
+  const data = await response.json() as {
+    choices: Array<{ message: { content: string } }>;
+  };
   const content = data.choices[0]?.message?.content;
 
   if (!content) {
     throw new Error('No response from Claude');
   }
 
-  // Parse the JSON response
-  // Try direct parsing first (if Claude returns clean JSON)
-  let analyses: ClaudeRawResponse;
+  // Parse JSON response
+  let parsed;
   try {
-    analyses = JSON.parse(content);
+    parsed = JSON.parse(content);
   } catch {
-    // Fall back to extracting JSON from code blocks or other text
-    const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) ||
-                      content.match(/\[[\s\S]*\]/);
-
+    const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       console.error('Failed to parse Claude response:', content);
-      throw new Error('Could not parse Claude response as JSON');
+      throw new Error('Could not parse Claude response');
     }
-
     const jsonStr = jsonMatch[1] || jsonMatch[0];
-    analyses = JSON.parse(jsonStr);
+    parsed = JSON.parse(jsonStr);
   }
 
-  // Cache the result
-  cache.set(cacheKey, { data: analyses, timestamp: Date.now() });
+  // Build sentiment map
+  const articleSentiments = new Map<string, 'positive' | 'neutral' | 'negative'>();
+  for (const item of parsed.articleSentiments || []) {
+    articleSentiments.set(item.articleId, item.sentiment);
+  }
 
-  console.log(`Claude analysis complete for ${analyses.length} articles`);
+  console.log(`Feed analysis complete: "${parsed.summary.slice(0, 50)}..."`);
 
-  return analyses;
+  return {
+    summary: parsed.summary,
+    topKeywords: parsed.topKeywords || [],
+    clusterLabels: parsed.clusterLabels || [],
+    articleSentiments,
+  };
 }
 
-function buildPrompt(articles: NewsArticle[]): string {
-  const articleSummaries = articles.map((a, i) => `
-Article ${i + 1} (ID: ${a.article_id}):
-Title: ${a.title}
-Description: ${a.description || 'N/A'}
-Content: ${a.content?.slice(0, 500) || a.description || 'N/A'}...
-Source: ${a.source_name}
-`).join('\n---\n');
+function buildFeedPrompt(articles: NewsArticle[], clusters: Cluster[]): string {
+  // Build article summaries grouped by cluster with descriptions for better context
+  const clusterSections = clusters.map((cluster, i) => {
+    const clusterArticles = articles.filter(a => cluster.articleIds.includes(a.article_id));
+    const articleList = clusterArticles.map(a => {
+      const desc = a.description ? ` — ${a.description.slice(0, 150)}` : '';
+      return `  - [${a.article_id}] "${a.title}"${desc}`;
+    }).join('\n');
 
-  return `Analyze these news articles. For each article, provide:
-1. A concise summary (2-3 sentences, focus on key facts)
-2. Keywords (3-5 relevant terms)
-3. Sentiment (positive/neutral/negative) and a score from -1 to 1
-4. Group similar articles together with a groupId and groupLabel
+    return `Cluster ${i + 1} (${clusterArticles.length} articles):\n${articleList}`;
+  }).join('\n\n');
 
-Return a JSON array with this exact structure:
+  const allArticles = articles.map(a =>
+    `[${a.article_id}] "${a.title}" - ${a.description || 'No description'}`
+  ).join('\n');
+
+  return `Analyze this news feed and provide:
+
+1. A structured summary ("The Brief") with 3-5 bullet points, each covering a key story or theme. Each bullet should be 1-2 sentences with specific details. Format as a markdown list with "- " prefixes.
+2. Top 5 keywords/topics across all articles
+3. A specific, descriptive label (3-6 words) for each cluster. Include specific names, companies, events, or locations when relevant. Avoid generic labels like "Tech News" or "Business Updates" — be specific about WHAT is happening (e.g., "OpenAI GPT-5 Launch", "EU AI Regulation Vote", "Tesla Q3 Earnings").
+4. Sentiment (positive/neutral/negative) for each article
+
+The articles have been pre-grouped into ${clusters.length} clusters by semantic similarity:
+
+${clusterSections}
+
+All articles:
+${allArticles}
+
+Return JSON in this exact format:
 \`\`\`json
-[
-  {
-    "articleId": "article_id_here",
-    "summary": "Concise summary...",
-    "keywords": ["keyword1", "keyword2", "keyword3"],
-    "sentiment": "neutral",
-    "sentimentScore": 0.1,
-    "groupId": "group-1",
-    "groupLabel": "Topic name for this cluster"
-  }
-]
+{
+  "summary": "Brief overview of the news feed...",
+  "topKeywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
+  "clusterLabels": ["Specific Event Label", "Company/Person Action", "Location Policy Change"],
+  "articleSentiments": [
+    {"articleId": "xxx", "sentiment": "positive"},
+    {"articleId": "yyy", "sentiment": "neutral"}
+  ]
+}
 \`\`\`
 
-Articles to analyze:
-${articleSummaries}
-
-Return ONLY the JSON array, no other text.`;
-}
-
-// Map Claude response back to our ClaudeAnalysis type
-export function mapClaudeResponse(
-  analyses: ClaudeRawResponse
-): Map<string, ClaudeAnalysis> {
-  const map = new Map<string, ClaudeAnalysis>();
-
-  for (const analysis of analyses) {
-    map.set(analysis.articleId, {
-      summary: analysis.summary,
-      keywords: analysis.keywords,
-      sentiment: analysis.sentiment,
-      sentimentScore: analysis.sentimentScore,
-      groupId: analysis.groupId,
-      groupLabel: analysis.groupLabel,
-    });
-  }
-
-  return map;
+Return ONLY the JSON, no other text.`;
 }

@@ -6,8 +6,8 @@ interface FilterBarProps {
   onTopicChange: (topic: TopicId) => void;
   onRegionChange: (region: RegionCode) => void;
   isLoading: boolean;
-  isAnalyzing: boolean;
   articleCount: number;
+  totalCount: number;
 }
 
 export function FilterBar({
@@ -16,9 +16,11 @@ export function FilterBar({
   onTopicChange,
   onRegionChange,
   isLoading,
-  isAnalyzing,
   articleCount,
+  totalCount,
 }: FilterBarProps) {
+  const isFiltered = articleCount !== totalCount;
+
   return (
     <div className="flex flex-wrap items-center gap-4 mb-8">
       {/* Region dropdown */}
@@ -29,7 +31,7 @@ export function FilterBar({
         <select
           value={region}
           onChange={(e) => onRegionChange(e.target.value as RegionCode)}
-          disabled={isLoading || isAnalyzing}
+          disabled={isLoading}
           className="bg-ink-light border border-ink-lighter text-cream px-3 py-2 rounded font-mono text-sm focus:border-amber focus:outline-none transition-colors cursor-pointer disabled:opacity-50"
         >
           {REGIONS.map((r) => (
@@ -48,7 +50,7 @@ export function FilterBar({
         <select
           value={topic}
           onChange={(e) => onTopicChange(e.target.value as TopicId)}
-          disabled={isLoading || isAnalyzing}
+          disabled={isLoading}
           className="bg-ink-light border border-ink-lighter text-cream px-3 py-2 rounded font-mono text-sm focus:border-amber focus:outline-none transition-colors cursor-pointer disabled:opacity-50"
         >
           {TOPICS.map((t) => (
@@ -68,7 +70,16 @@ export function FilterBar({
           </span>
         ) : (
           <span>
-            <span className="text-amber">{articleCount}</span> articles
+            {isFiltered ? (
+              <>
+                <span className="text-amber">{articleCount}</span>
+                <span className="text-slate"> of </span>
+                <span className="text-cream-dim">{totalCount}</span>
+              </>
+            ) : (
+              <span className="text-amber">{articleCount}</span>
+            )}
+            {' '}articles
           </span>
         )}
       </div>
