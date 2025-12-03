@@ -25,10 +25,10 @@ I still think Id test differnt layouts a bit more to try to find the best one. I
 
 ## What technical/product trade-offs you made during the task
 
-tanstack/react query vs fetch - fetch is simpler, no need to use tanstack for this scale.
-sqlite vs localstorage vs caching (tanstack/server) - sqlite allows for persistence without overhead of full postgres implementation
-vite + express vs next- vite and express is simple.
-embedding vs prompting - embedding adds too much bloat for the value it adds for this scale.
+* tanstack/react query vs fetch - fetch is simpler, no need to use tanstack for this scale.
+* sqlite vs localstorage vs caching (tanstack/server) - sqlite allows for persistence without overhead of full postgres implementation
+* vite + express vs next- vite and express is simple.
+* embedding vs prompting - embedding adds too much bloat for the value it adds for this scale.
 
 ## Considerations for scaling, reliability, performance, or UX
 
