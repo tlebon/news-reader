@@ -1,3 +1,10 @@
+# Environment
+.env
+.env.*
+
+# Database
+data/
+
 # Logs
 logs
 *.log
